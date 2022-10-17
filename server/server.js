@@ -13,11 +13,15 @@ app.use(bp.urlencoded({ extended: true }))
 
 
 
-app.get('/api/createApp', async (req, res) => {
+app.get('/api/createApp/Algorand', async (req, res) => {
   let txn = null
   try {
-   txn = await createTxn(req.query.token, req.query.creator, req.query.goal, req.query.durationInSeconds)
-   res.send(JSON.stringify(txn.toByte()))
+   txn = await createTxn(req.query.token, req.query.creator, req.query.goal, req.query.startDate, req.query.endDate)
+   let id = txn.txID().toString()
+   let merged = JSON.stringify({txnID: id, txnBody: txn.toByte()})
+   //console.log("txn: " + JSON.stringify(merged))
+   res.send(merged)
+
   } catch (err) {
     console.log(err)
     res.status(503).json({ error: `Error during the creation of the project.` });
@@ -33,7 +37,7 @@ app.get('/api/createApp', async (req, res) => {
 
 
 
-app.post('/api/createApp', [
+app.post('/api/createApp/Algorand', [
     // check('name').notEmpty(),
     // check('token').notEmpty(),
     // check('account').notEmpty(),
@@ -47,7 +51,8 @@ app.post('/api/createApp', [
     }
 
     try {
-      await createApp(1, req.body.signed_txn)
+      //FIXME: add token instead of 1
+      await createApp(1, req.body.txnID, req.body.signed_txn)
     } catch (err) {
       console.log(err)
       res.status(503).json({ error: `Error during the creation of the project.` });

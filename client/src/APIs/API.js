@@ -1,5 +1,5 @@
-export async function getUnsignedTxn(creatorAddress, goal, durationInSeconds) {
-    const response = await fetch('/api/createApp?creator=' + creatorAddress + "&goal=" + goal + "&duration=" + durationInSeconds);
+export async function getUnsignedTxn(creatorAddress, goal, startDate, endDate) {
+    const response = await fetch('/api/createApp/Algorand?creator=' + creatorAddress + "&goal=" + goal + "&startDate=" + startDate + "&endDate=" + endDate);
     const responseBody = await response.json();
     if (response.ok) {
       return responseBody;
@@ -8,17 +8,18 @@ export async function getUnsignedTxn(creatorAddress, goal, durationInSeconds) {
       throw responseBody;
   }
 
-  export function postSignedTxn(signed_txn) {
+  //FIXME = add token as first parameter
+  export function postSignedTxn(txnID, signed_txn) {
     return new Promise((resolve, reject) => {
-      fetch('/api/createApp', {
+      fetch('/api/createApp/Algorand', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ signed_txn: signed_txn }),
+        body: JSON.stringify({txnID: txnID, signed_txn: signed_txn }),
       }).then((response) => {
         if (response.ok) {
-          resolve(null);
+          resolve("Application created");
         } else {
           response.json()
             .then((message) => { reject(message); })

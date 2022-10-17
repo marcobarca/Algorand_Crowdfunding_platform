@@ -1,6 +1,8 @@
 
 export async function signTransaction(txn) {
 
+    console.log(txn)
+
     // TODO = improve this
     let txn_array = new Array();
 

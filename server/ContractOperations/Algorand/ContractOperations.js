@@ -1,8 +1,8 @@
 const algosdk = require('algosdk');
 const approval = require('../../Contracts/Algorand/Approval');
+const clear = require('../../Contracts/Algorand/Clear');
 const fs = require('fs');
 const path = require('path');
-const clear = require('../../Contracts/Algorand/Clear');
 const { domainToASCII } = require('url');
 
 
@@ -19,16 +19,30 @@ const compileTeal = async (client, tealFile) => {
     }
 }
 
+function dateToTimestamp(dateStr) {
+
+    // 👇️ Formatted as YYYY-MM-DD hh:mm
+    const [dateComponents, timeComponents] = dateStr.split('T');
+
+    const [year, month, day] = dateComponents.split('-');
+    const [hours, minutes] = timeComponents.split(':');
+
+    const date = new Date(+year, month - 1, +day, +hours, +minutes,);
+
+    // ✅ Get Unix timestamp
+    const unixTimestamp = Math.floor(date.getTime() / 1000);
+    return unixTimestamp * 1000
+}
+
+
 //CREATE TXN
 // This function create the transaction and returns it in order to let the 
 // user sign it
-async function createTxn(token, creator, goal, duration) {
+async function createTxn(token, creator, goal, startDate, endDate) {
     token = { 'X-API-Key': 'CgpLPSpm3m4P2sbVVnv4285wAYOHivCg1MoyJgzx' }
 
     const algodServer = "https://testnet-algorand.api.purestake.io/ps2/";
     const client = new algosdk.Algodv2(token, algodServer, '');
-
-    console.log(creator)
 
     if (client !== null) {
         client
@@ -48,15 +62,16 @@ async function createTxn(token, creator, goal, duration) {
     const globalInts = 14;
     const globalBytes = 1;
 
-    const startTime = new Date().getTime()
-    const endTime = startTime + duration * 1000
+    startDate = dateToTimestamp(startDate);
+    endDate = dateToTimestamp(endDate);
+
     //create list of bytes for app args
     let appArgs = [];
     if (creator !== undefined) {
         console.log(appArgs.push(
             algosdk.decodeAddress(creator).publicKey,
-            algosdk.bigIntToBytes(startTime, 8),
-            algosdk.bigIntToBytes(endTime, 8),
+            algosdk.bigIntToBytes(startDate, 8),
+            algosdk.bigIntToBytes(endDate, 8),
             algosdk.bigIntToBytes(goal, 8),
         ))
     }
@@ -86,14 +101,18 @@ async function createTxn(token, creator, goal, duration) {
         approvalProgram, clearProgram,
         localInts, localBytes, globalInts, globalBytes, appArgs);
 
+
     return txn
 }
 
 
-//CREATE APP
+//DEPLOY CONTRACT ON CHAIN 
 // This function has as parametes the token and the signed transaction
-async function createApp(token, signed_txn) {
+async function createApp(token, txnID, signed_txn) {
 
+    console.log("CREATION")
+
+    //TODO = change to env variable
     token = { 'X-API-Key': 'CgpLPSpm3m4P2sbVVnv4285wAYOHivCg1MoyJgzx' }
 
     const algodServer = "https://testnet-algorand.api.purestake.io/ps2/";
@@ -123,28 +142,27 @@ async function createApp(token, signed_txn) {
     }
 
     signed_txn = new Uint8Array(txn_array);
-
+    
     console.log(signed_txn)
 
+    // FIXME
     // Send the transaction through the SDK client
     console.log("Attempting to send transaction")
     await client.sendRawTransaction(signed_txn).do();
-
-
-    return 
     
-    console.log("Tx id: " + JSON.stringify(txId))
+    
+    console.log("Tx id: " + JSON.stringify(txnID))
 
 
     // Wait for transaction to be confirmed
-    let confirmedTxn = await algosdk.waitForConfirmation(client, txId, 4);
+    let confirmedTxn = await algosdk.waitForConfirmation(client, txnID, 4);
     console.log("confirmed" + confirmedTxn)
 
     //Get the completed Transaction
-    console.log("Transaction " + txId + " confirmed in round " + confirmedTxn["confirmed-round"]);
+    console.log("Transaction " + txnID + " confirmed in round " + confirmedTxn["confirmed-round"]);
 
     // display results
-    let transactionResponse = await client.pendingTransactionInformation(txId).do()
+    let transactionResponse = await client.pendingTransactionInformation(txnID).do()
     let appId = transactionResponse['application-index'];
     console.log("Response: " + JSON.stringify(transactionResponse))
     console.log("Created new app-id: ", appId);

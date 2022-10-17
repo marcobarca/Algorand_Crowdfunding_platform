@@ -1,6 +1,5 @@
 from pyteal import *
 
-
 def approval_program():
     creator_key = Bytes("creator")
     start_time_key = Bytes("start")
