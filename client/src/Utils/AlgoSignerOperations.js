@@ -4,10 +4,10 @@ export async function signTransaction(txn) {
     console.log(txn)
 
     // TODO = improve this
-    let txn_array = new Array();
+    let txn_array = []
 
     let i = 0;
-    while (txn[i] != undefined) {
+    while (txn[i] !== undefined) {
         txn_array.push(txn[i]);
         i++;
     }

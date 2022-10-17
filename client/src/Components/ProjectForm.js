@@ -3,7 +3,6 @@ import Form from 'react-bootstrap/Form';
 import { Col, Row } from 'react-bootstrap';
 import { getUnsignedTxn, postSignedTxn } from '../APIs/API';
 import { signTransaction } from '../Utils/AlgoSignerOperations';
-import { Icon } from '@iconify/react';
 
 function ProjectForm() {
 
@@ -54,7 +53,8 @@ function ProjectForm() {
             case "Cardano":
                 console.log("Blockchain not supported yet.")
                 break;
-
+            default:
+                break;
         }
 
     }
