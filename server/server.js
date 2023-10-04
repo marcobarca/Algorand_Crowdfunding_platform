@@ -1,83 +1,125 @@
 const express = require('express');
 const { check, validationResult } = require('express-validator');
-const port = 3001;
-app = new express();
 const bp = require('body-parser');
-const { send } = require('express/lib/response');
 const dao = require('./dao');
-
-const {createTxn, createApp} = require('./ContractOperations/Algorand/ContractOperations')
-
+const { ResultWithContext } = require('express-validator/src/chain');
+app = new express();
 app.use(bp.json())
 app.use(bp.urlencoded({ extended: true }))
 
+//Server listening port
+const port = 3001;
 
-
-app.get('/api/createApp/Algorand', async (req, res) => {
-  let txn = null
+// appId, creatorAddress, name, description, imageUrl, start, end, goal
+app.post('/api/applications/create', [
+  // check('appId').notEmpty(),
+  // check('creatorAddress').notEmpty(),
+  // check('name').notEmpty(),
+  // check('description').notEmpty(),
+  // check('imageUrl').notEmpty(),
+  // check('start').notEmpty(),
+  // check('end').notEmpty(),
+  // check('goal').notEmpty(),
+], async (req, res) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return res.status(422).json({ errors: errors.array() });
+  }
   try {
-   txn = await createTxn(req.query.token, req.query.creator, req.query.goal, req.query.startDate, req.query.endDate)
-   let id = txn.txID().toString()
-   let merged = JSON.stringify({txnID: id, txnBody: txn.toByte()})
-   //console.log("txn: " + JSON.stringify(merged))
-   res.send(merged)
-
+    await dao.createApp(req.body.appId, req.body.creatorAddress, req.body.name, req.body.description, req.body.imageUrl, req.body.start, req.body.end, parseFloat(req.body.goal))
+    res.status(201).end();
   } catch (err) {
-    console.log(err)
-    res.status(503).json({ error: `Error during the creation of the project.` });
+    res.status(503).json({ error: `Database error during the creation of the app.` });
   }
 
-  try {
-      //await dao.createTxn(req.body.name, req.body.account, txn) //txn.result
-      res.status(201).end();
-    } catch (err) {
-      res.status(503).json({ error: `Database error during the creation of the txn.` });
-    }
 });
 
+// funderAddress, appId, amount
+app.post('/api/applications/fund', [
+  // check('funderAddress').notEmpty(),
+  // check('appId').notEmpty(),
+  // check('amount').notEmpty(),
+], async (req, res) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return res.status(422).json({ errors: errors.array() });
+  }
+  try {
+    await dao.fundApp(req.body.funderAddress, req.body.appId, parseFloat(req.body.amount))
+    res.status(201).end();
+  } catch (err) {
+    res.status(503).json({ error: `Database error during the funding of the app.` });
+  }
 
+});
 
-app.post('/api/createApp/Algorand', [
-    // check('name').notEmpty(),
-    // check('token').notEmpty(),
-    // check('account').notEmpty(),
-    // check('goal').notEmpty(),
-    // check('durationInSeconds').notEmpty(),
-  ], async (req, res) => {
+app.get('/api/applications', async (req, res) => {
+  try {
+    let apps = null
+    if (req.query.creatorAddress == null)
+      //Get all applications created
+      apps = await dao.getAllApplications()
+    else
+      //Get all applications created from creator address
+      apps = await dao.getApplicationsFromCreatorAddress(req.query.creatorAddress)
+    res.json(apps);
+  } catch (err) {
+    res.status(500).end();
+  }
+});
 
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-        return res.status(422).json({ errors: errors.array() });
+app.get('/api/application', async (req, res) => {
+  try {
+    let apps = await dao.getApplicationFromAppId(req.query.appId)
+    res.json(apps);
+  } catch (err) {
+    res.status(500).end();
+  }
+});
+
+app.get('/api/funder', async (req, res) => {
+  console.log("AppInfo=" + req.query.appInfo + " appId = " + req.query.appId)
+  try {
+    let result = null
+    switch(req.query.appId){
+      case(undefined):
+
+      //ALL THE APPS
+        if(req.query.appInfo == 1){
+          //Get funded amount plus appInfp from funderAddress related to a single app
+          result = await dao.getAllFundedApplicationsAndAppsInfoFromFunderAddress(req.query.funderAddress)
+        }
+        else{
+          //Get all funded apps from funderAddress
+          result = await dao.getAllFundedApplicationsFromFunderAddress(req.query.funderAddress)
+        }
+        break
+        
+      //JUST ONE APP
+      default:
+        if(req.query.appInfo == 1){
+          //Get funded amount plus app info from funderAddress and appId
+          result = await dao.getFundedAmountAndAppInfoFromFunderAddressAndAppId(req.query.funderAddress, req.query.appId)
+        }
+        else{
+          //Get funded amount from funderAddress and appId
+          result = await dao.getFundedApplicationAmountFromFunderAddressAndAppId(req.query.funderAddress, req.query.appId)
+        }
     }
+    res.json(result);
+  } catch (err) {
+    res.status(500).end();
+  }
+});
 
-    try {
-      //FIXME: add token instead of 1
-      await createApp(1, req.body.txnID, req.body.signed_txn)
-    } catch (err) {
-      console.log(err)
-      res.status(503).json({ error: `Error during the creation of the project.` });
-    }
-
-
-    try {
-        //await dao.createTxn(req.body.name, req.body.account, txn) //txn.result
-        res.status(201).end();
-      } catch (err) {
-        res.status(503).json({ error: `Database error during the creation of the txn.` });
-      }
-
-  });
-
-
-
-  // app.get('/api/createApp', async (req, res) => {
-  //   try {
-  //   let txn =  await dao.getTxn(req.query.account, req.query.name)
-  //     res.json(txn);
-  //   } catch (err) {
-  //     res.status(500).end();
-  //   }
-  // });
+app.get('/api/funded', async (req, res) => {
+  try {
+    let apps = await dao.getFundedApplicationAmountFromAppId(req.query.appId)
+    res.json(apps);
+  } catch (err) {
+    res.status(500).end();
+  }
+});
 
 
 app.listen(port, () => {
